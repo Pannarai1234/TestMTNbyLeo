@@ -3,133 +3,1239 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ระบบแจ้งซ่อม (Test_MNT)</title>
+  <title>Maintenance Real-time Monitor & Analytics</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    body { font-family: sans-serif; max-width: 700px; margin: 30px auto; padding: 0 15px; background: #f4f6f9; color: #333; }
-    .card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
-    h2 { margin-top: 0; color: #1a73e8; }
-    label { display: block; margin-top: 12px; font-weight: bold; font-size: 14px; }
-    input, select, textarea { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; font-family: inherit; }
-    button { margin-top: 16px; padding: 12px 20px; background: #1a73e8; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-size: 15px; width: 100%; }
-    button:hover { background: #1557b0; }
-    button:disabled { background: #999; cursor: not-allowed; }
-    .btn-secondary { background: #34a853; margin-top: 0; width: auto; padding: 8px 14px; font-size: 13px; }
-    .btn-secondary:hover { background: #2a8542; }
-    table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }
-    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-    th { background: #f1f3f4; }
-    .status { font-weight: bold; color: #d93025; }
+    body { 
+      font-family: 'Inter', sans-serif; 
+      background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); 
+      min-height: 100vh; 
+      color: #334155; 
+    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    /* Year buttons scroll container */
+    #year-buttons-container {
+      overflow-x: auto;
+      scrollbar-width: thin;
+      scrollbar-color: #cbd5e1 #f1f5f9;
+    }
+    #year-buttons-container::-webkit-scrollbar { height: 4px; }
+    #year-buttons-container::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 2px; }
+    #year-buttons-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
   </style>
 </head>
-<body>
+<body class="p-4 md:p-8 antialiased">
 
-  <!-- ส่วนที่ 1: ฟอร์มส่งข้อมูลแจ้งซ่อม (POST) -->
-  <div class="card">
-    <h2>🔧 แจ้งซ่อมเครื่องจักร</h2>
-    <form id="repairForm">
-      <label for="machine">ชื่อ / รหัสเครื่องจักร</label>
-      <input type="text" id="machine" name="machine" placeholder="เช่น Forging Press #1" required>
-
-      <label for="issue">อาการเสีย / รายละเอียด</label>
-      <textarea id="issue" name="issue" rows="3" placeholder="อธิบายอาการที่พบ..." required></textarea>
-
-      <label for="reporter">ชื่อผู้แจ้ง</label>
-      <input type="text" id="reporter" name="reporter" placeholder="ระบุชื่อผู้แจ้ง" required>
-
-      <input type="hidden" name="status" value="รอดำเนินการ">
-
-      <button type="submit" id="submitBtn">ส่งใบแจ้งซ่อม</button>
-    </form>
+  <!-- Header -->
+  <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-200 pb-6 mb-8 gap-4">
+    <div>
+      <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 flex items-center gap-3">
+        <span class="relative flex h-3 w-3">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+        </span>
+        Maintenance Monitoring Center
+      </h1>
+      <p class="text-slate-500 text-sm mt-1.5 font-medium">ระบบติดตามสถานะการแจ้งซ่อมและประสิทธิภาพทีมวิศวกรแบบ Real-time  <span class="bg-blue-50 text-blue-600 border border-blue-200 px-2 py-0.5 rounded text-xs ml-1 font-bold">V1.04</span></p>
+    </div>
+    <div class="bg-white border border-slate-200 px-5 py-2.5 rounded-xl shadow-sm text-left md:text-right flex flex-col justify-center min-w-[180px]">
+      <span class="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">อัปเดตล่าสุด</span>
+      <span id="txt-update-time" class="text-emerald-600 font-mono text-base font-bold tracking-tight">กำลังโหลด...</span>
+    </div>
   </div>
 
-  <!-- ส่วนที่ 2: ดึงข้อมูลรายการแจ้งซ่อมมาแสดง (GET) -->
-  <div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-      <h2 style="margin: 0;">📋 รายการแจ้งซ่อม</h2>
-      <button type="button" class="btn-secondary" onclick="loadJobs()">รีเฟรชข้อมูล</button>
+  <div class="max-w-7xl mx-auto space-y-6">
+    
+    <!-- ส่วนที่ 1: KPI Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+        <div class="absolute top-0 left-0 w-1.5 h-full bg-blue-500"></div>
+        <div class="flex justify-between items-center mb-3">
+          <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Today Efficiency</span>
+          <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-600 border border-blue-100">วันนี้</span>
+        </div>
+        <div class="flex items-baseline gap-3">
+          <span id="eff-day" class="text-4xl font-black text-slate-900 tracking-tight">0%</span>
+          <span id="count-day" class="text-xs font-medium text-slate-500 group-hover:text-slate-800 transition-colors">Loading...</span>
+        </div>
+      </div>
+      
+      <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+        <div class="absolute top-0 left-0 w-1.5 h-full bg-emerald-500"></div>
+        <div class="flex justify-between items-center mb-3">
+          <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Monthly Efficiency</span>
+          <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100">เดือนนี้</span>
+        </div>
+        <div class="flex items-baseline gap-3">
+          <span id="eff-month" class="text-4xl font-black text-slate-900 tracking-tight">0%</span>
+          <span id="count-month" class="text-xs font-medium text-slate-500 group-hover:text-slate-800 transition-colors">Loading...</span>
+        </div>
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+        <div class="absolute top-0 left-0 w-1.5 h-full bg-amber-500"></div>
+        <div class="flex justify-between items-center mb-3">
+          <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Yearly Cumulative</span>
+          <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-600 border border-amber-100">สะสมทั้งปี</span>
+        </div>
+        <div class="flex items-baseline gap-3">
+          <span id="eff-year" class="text-4xl font-black text-slate-900 tracking-tight">0%</span>
+          <span id="count-year" class="text-xs font-medium text-slate-500 group-hover:text-slate-800 transition-colors">Loading...</span>
+        </div>
+      </div>
     </div>
-    <div id="jobList">กำลังโหลดข้อมูล...</div>
+
+    <!-- ส่วนที่ 2: ตัวเลือกช่วงเวลา (Time Filter) — รองรับหลายปีแบบ Dynamic -->
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white border border-slate-200 p-4 rounded-2xl shadow-sm">
+      <div class="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:w-auto">
+        <span class="text-xs text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1 shrink-0">
+          <span>📅</span> ช่วงเวลาจัดแสดง:
+        </span>
+        <!-- ปุ่ม Fixed: วันนี้, เดือนนี้, ปีนี้ -->
+        <div class="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200 shrink-0">
+          <button onclick="setTimeFilter('today')" id="btn-time-today" class="px-4 py-1.5 rounded-lg text-xs font-bold transition-all bg-white text-slate-800 shadow-sm border border-slate-200">วันนี้</button>
+          <button onclick="setTimeFilter('month')" id="btn-time-month" class="px-4 py-1.5 rounded-lg text-xs font-bold transition-all text-slate-500 hover:text-slate-800">เดือนนี้</button>
+          <button onclick="setTimeFilter('year')" id="btn-time-year" class="px-4 py-1.5 rounded-lg text-xs font-bold transition-all text-slate-500 hover:text-slate-800">ปีนี้</button>
+          <button onclick="setTimeFilter('all')" id="btn-time-all" class="px-4 py-1.5 rounded-lg text-xs font-bold transition-all text-slate-500 hover:text-slate-800">ทั้งหมด</button>
+        </div>
+
+        <!-- Month selector — แสดงเมื่อเลือก "เดือนนี้" -->
+        <div id="month-selector-wrap" class="hidden items-center gap-2">
+          <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider shrink-0">📆 เดือน:</span>
+          <select id="month-select" onchange="setMonthFilter(this.value)"
+            class="bg-white border border-slate-300 focus:border-blue-500 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-4 focus:ring-blue-500/10 cursor-pointer transition-all">
+            <option value="0">มกราคม</option>
+            <option value="1">กุมภาพันธ์</option>
+            <option value="2">มีนาคม</option>
+            <option value="3">เมษายน</option>
+            <option value="4">พฤษภาคม</option>
+            <option value="5">มิถุนายน</option>
+            <option value="6">กรกฎาคม</option>
+            <option value="7">สิงหาคม</option>
+            <option value="8">กันยายน</option>
+            <option value="9">ตุลาคม</option>
+            <option value="10">พฤศจิกายน</option>
+            <option value="11">ธันวาคม</option>
+          </select>
+          <select id="month-year-select" onchange="setMonthFilter(document.getElementById('month-select').value)"
+            class="bg-white border border-slate-300 focus:border-blue-500 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-4 focus:ring-blue-500/10 cursor-pointer transition-all" id="month-year-select">
+          </select>
+        </div>
+
+        <!-- Divider -->
+        <div class="hidden sm:block w-px h-6 bg-slate-200 shrink-0"></div>
+
+        <!-- ปุ่มปีแบบ Dynamic — เลื่อนซ้าย-ขวาได้ -->
+        <div class="flex items-center gap-2 min-w-0">
+          <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider shrink-0">แยกรายปี:</span>
+          <div id="year-buttons-container" class="flex items-center gap-1 rounded-xl bg-slate-100 p-1 border border-slate-200">
+            <!-- ปุ่มปีจะถูกสร้างโดย JavaScript หลังโหลดข้อมูล -->
+            <span id="year-buttons-placeholder" class="px-3 py-1.5 text-xs text-slate-400 font-medium">กำลังโหลดข้อมูลปี...</span>
+          </div>
+        </div>
+      </div>
+
+      <button onclick="loadDashboardData()" class="w-full sm:w-auto shrink-0 text-xs bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-xl transition-all font-bold flex items-center justify-center gap-2 shadow-sm active:scale-95">
+        🔄 ดึงข้อมูลสดใหม่
+      </button>
+    </div>
+
+    <!-- กราฟแนวโน้ม -->
+    <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-6">
+        <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+          <span>📈</span> กราฟแนวโน้มภาระงานและสถานะการซ่อมแซม (<span id="txt-chart-scope" class="text-blue-600 font-extrabold">วันนี้</span>)
+        </h3>
+        <span class="text-[11px] text-slate-400 font-medium">* ตัวเลขกราฟและช่องหมวดหมู่จะคำนวณสอดคล้องตามตัวกรองย่อยที่คุณเลือกแบบ Dynamic</span>
+      </div>
+      <div class="w-full relative" style="height: 280px;">
+        <canvas id="timeTrendLineChart"></canvas>
+      </div>
+    </div>
+
+    <!-- กราฟ Top 10 Machine Code -->
+    <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4">
+        <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+          <span>🏭</span> Top 10 Machine Code ที่แจ้งซ่อมบ่อยสุด
+          <span id="txt-top10-scope" class="text-rose-600 font-extrabold normal-case tracking-normal text-sm"></span>
+        </h3>
+        <div class="flex items-center gap-3">
+          <span class="text-[11px] text-slate-400 font-medium">* คลิกแท่งเพื่อกรอง Machine Code</span>
+          <button onclick="clearTop10Filter()" id="btn-clear-top10" class="hidden text-[11px] font-bold bg-rose-50 text-rose-600 border border-rose-200 px-3 py-1.5 rounded-lg hover:bg-rose-100 transition-all">
+            ✕ ล้าง MC Filter
+          </button>
+        </div>
+      </div>
+      <div class="w-full relative" style="height: 260px;">
+        <canvas id="top10BarChart"></canvas>
+      </div>
+    </div>
+
+    <!-- กราฟ Pie 3 อัน: Shift / Effect Type / Root Cause (Category) -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+      <!-- Pie 1: Work Shift -->
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+        <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4">
+          <span>🕐</span> สัดส่วนกะทำงาน (Shift)
+          <span id="txt-pie-shift-total" class="text-[11px] text-slate-400 font-medium normal-case"></span>
+        </h3>
+        <div class="relative" style="height:220px;">
+          <canvas id="pieShiftChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Pie 2: Effect Type -->
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+        <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4">
+          <span>⚠️</span> สัดส่วน Effect Type
+          <span id="txt-pie-effect-total" class="text-[11px] text-slate-400 font-medium normal-case"></span>
+        </h3>
+        <div class="relative" style="height:220px;">
+          <canvas id="pieEffectChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Pie 3: Category (Root Cause) -->
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+        <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4">
+          <span>🔧</span> สัดส่วน Root Cause (คอลัมน์ T)
+          <span id="txt-pie-cat-total" class="text-[11px] text-slate-400 font-medium normal-case"></span>
+        </h3>
+        <div class="relative" style="height:220px;">
+          <canvas id="pieCatChart"></canvas>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ส่วนที่ 3: Category Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+
+      <!-- ALL -->
+      <button onclick="setCategoryFilter('ALL')" id="btn-cat-all" class="bg-white border-2 border-blue-500 rounded-2xl p-4 text-left transition-all shadow-sm flex flex-col gap-1 hover:scale-[1.02] duration-200 group">
+        <span class="text-[11px] text-blue-600 uppercase font-extrabold tracking-wider">🌐 ทุกหมวดหมู่</span>
+        <span id="pend-cat-all" class="text-3xl font-black text-red-500 tracking-tight leading-tight">0</span>
+        <span class="text-[10px] text-red-400 font-bold -mt-1">● รอดำเนินการ</span>
+        <div class="w-full border-t border-slate-100 pt-2 mt-1 flex items-center justify-between">
+          <span class="text-[11px] text-slate-500 font-bold">ทั้งหมด <span id="count-type-all" class="text-slate-800 font-black">0</span></span>
+          <span class="text-[11px] text-emerald-600 font-bold">✓ เสร็จสิ้น <span id="done-cat-all" class="text-emerald-700 font-black">0</span></span>
+        </div>
+      </button>
+
+      <!-- MECHANICAL -->
+      <button onclick="setCategoryFilter('MECHANICAL')" id="btn-cat-mechanical" class="bg-white border-2 border-transparent rounded-2xl p-4 text-left transition-all hover:border-slate-300 shadow-sm flex flex-col gap-1 hover:scale-[1.02] duration-200 group">
+        <span class="text-[11px] text-slate-400 uppercase font-extrabold tracking-wider group-hover:text-blue-600 transition-colors">⚙️ MECHANICAL</span>
+        <span id="pend-cat-mechanical" class="text-3xl font-black text-red-500 tracking-tight leading-tight">0</span>
+        <span class="text-[10px] text-red-400 font-bold -mt-1">● รอดำเนินการ</span>
+        <div class="w-full border-t border-slate-100 pt-2 mt-1 flex items-center justify-between">
+          <span class="text-[11px] text-slate-500 font-bold">ทั้งหมด <span id="count-type-mechanical" class="text-slate-800 font-black">0</span></span>
+          <span class="text-[11px] text-emerald-600 font-bold">✓ เสร็จสิ้น <span id="done-cat-mechanical" class="text-emerald-700 font-black">0</span></span>
+        </div>
+      </button>
+
+      <!-- ELECTRICAL -->
+      <button onclick="setCategoryFilter('ELECTRICAL')" id="btn-cat-electrical" class="bg-white border-2 border-transparent rounded-2xl p-4 text-left transition-all hover:border-slate-300 shadow-sm flex flex-col gap-1 hover:scale-[1.02] duration-200 group">
+        <span class="text-[11px] text-slate-400 uppercase font-extrabold tracking-wider group-hover:text-blue-600 transition-colors">⚡ ELECTRICAL</span>
+        <span id="pend-cat-electrical" class="text-3xl font-black text-red-500 tracking-tight leading-tight">0</span>
+        <span class="text-[10px] text-red-400 font-bold -mt-1">● รอดำเนินการ</span>
+        <div class="w-full border-t border-slate-100 pt-2 mt-1 flex items-center justify-between">
+          <span class="text-[11px] text-slate-500 font-bold">ทั้งหมด <span id="count-type-electrical" class="text-slate-800 font-black">0</span></span>
+          <span class="text-[11px] text-emerald-600 font-bold">✓ เสร็จสิ้น <span id="done-cat-electrical" class="text-emerald-700 font-black">0</span></span>
+        </div>
+      </button>
+
+      <!-- UTILITY -->
+      <button onclick="setCategoryFilter('UTILITY')" id="btn-cat-utility" class="bg-white border-2 border-transparent rounded-2xl p-4 text-left transition-all hover:border-slate-300 shadow-sm flex flex-col gap-1 hover:scale-[1.02] duration-200 group">
+        <span class="text-[11px] text-slate-400 uppercase font-extrabold tracking-wider group-hover:text-blue-600 transition-colors">💧 UTILITY</span>
+        <span id="pend-cat-utility" class="text-3xl font-black text-red-500 tracking-tight leading-tight">0</span>
+        <span class="text-[10px] text-red-400 font-bold -mt-1">● รอดำเนินการ</span>
+        <div class="w-full border-t border-slate-100 pt-2 mt-1 flex items-center justify-between">
+          <span class="text-[11px] text-slate-500 font-bold">ทั้งหมด <span id="count-type-utility" class="text-slate-800 font-black">0</span></span>
+          <span class="text-[11px] text-emerald-600 font-bold">✓ เสร็จสิ้น <span id="done-cat-utility" class="text-emerald-700 font-black">0</span></span>
+        </div>
+      </button>
+
+      <!-- PM -->
+      <button onclick="setCategoryFilter('PM')" id="btn-cat-pm" class="bg-white border-2 border-transparent rounded-2xl p-4 text-left transition-all hover:border-slate-300 shadow-sm flex flex-col gap-1 hover:scale-[1.02] duration-200 group">
+        <span class="text-[11px] text-slate-400 uppercase font-extrabold tracking-wider group-hover:text-blue-600 transition-colors">📋 PM</span>
+        <span id="pend-cat-pm" class="text-3xl font-black text-red-500 tracking-tight leading-tight">0</span>
+        <span class="text-[10px] text-red-400 font-bold -mt-1">● รอดำเนินการ</span>
+        <div class="w-full border-t border-slate-100 pt-2 mt-1 flex items-center justify-between">
+          <span class="text-[11px] text-slate-500 font-bold">ทั้งหมด <span id="count-type-pm" class="text-slate-800 font-black">0</span></span>
+          <span class="text-[11px] text-emerald-600 font-bold">✓ เสร็จสิ้น <span id="done-cat-pm" class="text-emerald-700 font-black">0</span></span>
+        </div>
+      </button>
+
+    </div>
+
+    <!-- ส่วนที่ 4: ตาราง + ตัวกรองย่อย -->
+    <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+      <div class="p-6 border-b border-slate-200 bg-slate-50/50 flex flex-col gap-5">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+              <span>📊</span> แผงควบคุมฟิลเตอร์และตารางข้อมูล 
+              <span id="badge-table-count" class="bg-blue-50 text-blue-600 text-xs px-3 py-1 rounded-full font-bold border border-blue-100">0 รายการ</span>
+            </h2>
+            <p class="text-xs text-slate-500 mt-1 font-medium">เลือกเงื่อนไขด้านล่างเพื่อวิเคราะห์เจาะลึก ข้อมูลกราฟและตัวเลขสรุปจะเปลี่ยนตามทันที</p>
+          </div>
+          <button onclick="resetSubFilters()" class="text-xs font-bold bg-white hover:bg-rose-50 text-rose-600 border border-slate-200 hover:border-rose-200 px-4 py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 active:scale-95">
+            🧹 ล้างตัวกรองย่อยทั้งหมด
+          </button>
+        </div>
+        
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 p-5 bg-slate-50 border border-slate-200 rounded-xl">
+
+          <!-- Search Machine Code -->
+          <div class="space-y-1.5 sm:col-span-2 md:col-span-4">
+            <label class="text-xs text-slate-600 font-bold flex items-center gap-1.5">
+              <span>🔍</span> ค้นหา Machine Code (เช่น G220, W1118)
+            </label>
+            <div class="relative">
+              <input type="text" id="search-mc-input" placeholder="พิมพ์ Machine Code เพื่อค้นหา..."
+                oninput="setMcSearch(this.value)"
+                class="w-full bg-white border border-slate-300 focus:border-blue-500 rounded-xl pl-9 pr-4 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all placeholder:font-normal placeholder:text-slate-400">
+              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔍</span>
+              <button onclick="clearMcSearch()" id="clear-mc-btn" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-500 font-bold text-sm transition-colors">✕</button>
+            </div>
+          </div>
+
+          <div class="space-y-1.5">
+            <label for="filter-line-select" class="text-xs text-slate-600 font-bold flex items-center gap-1.5">
+              <span>🏭</span> Line / ไลน์ผลิตหลัก
+            </label>
+            <select id="filter-line-select" onchange="setLineFilter(this.value)" class="w-full bg-white border border-slate-300 focus:border-blue-500 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-4 focus:ring-blue-500/10 cursor-pointer transition-all">
+              <option value="ALL">ทั้งหมด (All Lines)</option>
+            </select>
+          </div>
+
+          <div class="space-y-1.5">
+            <label for="filter-section-select" class="text-xs text-slate-600 font-bold flex items-center gap-1.5">
+              <span>📍</span> Area / พื้นที่ใช้งาน
+            </label>
+            <select id="filter-section-select" onchange="setSectionFilter(this.value)" class="w-full bg-white border border-slate-300 focus:border-blue-500 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-4 focus:ring-blue-500/10 cursor-pointer transition-all">
+              <option value="ALL">ทั้งหมด (All Areas)</option>
+            </select>
+          </div>
+
+          <div class="space-y-1.5">
+            <label for="filter-effect-select" class="text-xs text-slate-600 font-bold flex items-center gap-1.5">
+              <span>⚠️</span> Effect Type / หมวดแจ้ง
+            </label>
+            <select id="filter-effect-select" onchange="setEffectFilter(this.value)" class="w-full bg-white border border-slate-300 focus:border-blue-500 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-4 focus:ring-blue-500/10 cursor-pointer transition-all">
+              <option value="ALL">ทั้งหมด (All Effects)</option>
+            </select>
+          </div>
+
+          <div class="space-y-1.5">
+            <label for="filter-status-select" class="text-xs text-slate-600 font-bold flex items-center gap-1.5">
+              <span>🚦</span> Status / Status งานซ่อม
+            </label>
+            <select id="filter-status-select" onchange="setStatusFilter(this.value)" class="w-full bg-white border border-slate-300 focus:border-blue-500 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-4 focus:ring-blue-500/10 cursor-pointer transition-all">
+              <option value="ALL">แสดงสถานะทั้งหมด (All)</option>
+              <option value="PENDING">● รอดำเนินการ (Pending)</option>
+              <option value="COMPLETE">✓ เสร็จสิ้น (Complete)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider bg-slate-50/70">
+              <th class="p-4 pl-6">WO No. / วันเวลา</th>
+              <th class="p-4">หมายเลขเครื่อง / พื้นที่</th>
+              <th class="p-4">ไลน์ผลิต / หมวดหมู่หลัก</th>
+              <th class="p-4">อาการเสีย / หมวดแจ้งเหตุ</th>
+              <th class="p-4">Section / แผนก </th>
+              <th class="p-4 text-center pr-6">สถานะเบื้องต้น</th>
+            </tr>
+          </thead>
+          <tbody id="table-body" class="divide-y divide-slate-100 text-xs bg-white text-slate-600">
+            <tr>
+              <td colspan="6" class="p-12 text-center text-slate-400 font-medium">
+                <div class="flex flex-col items-center justify-center gap-2">
+                  <span class="animate-spin text-xl">⏳</span>
+                  <span>กำลังดึงข้อมูลและกรองเงื่อนไขฐานข้อมูล...</span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
   </div>
 
   <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwOpoaH12S6oLyJKv4k8oZcjVZWWhvT7jGIKZkN9skCroJV9TEjktAQiEFtcwbbUIVA/exec";
+    let rawGlobalRecords = [];
+    let currentFilterTime = 'today'; 
+    let currentFilterCategory = 'ALL';
+    
+    let currentFilterLine    = 'ALL'; 
+    let currentFilterSection = 'ALL'; 
+    let currentFilterEffect  = 'ALL';
+    let currentFilterStatus  = 'ALL';
+    let currentFilterMC      = '';      // Machine Code search
+    let currentFilterMonth   = -1;      // -1 = ใช้เดือนปัจจุบัน, 0-11 = เดือนที่เลือก
+    let currentFilterMonthYear = -1;    // -1 = ใช้ปีปัจจุบัน
+    
+    let myLineChart  = null;
+    let myTop10Chart = null;
+    let myPieShift   = null;
+    let myPieEffect  = null;
+    let myPieCat     = null;
 
-    // 1. ส่งข้อมูลแจ้งซ่อม (POST)
-    const form = document.getElementById("repairForm");
-    const submitBtn = document.getElementById("submitBtn");
+    Chart.register(ChartDataLabels);
 
-    form.addEventListener("submit", function(e) {
-      e.preventDefault();
-      submitBtn.disabled = true;
-      submitBtn.textContent = "กำลังส่งข้อมูล...";
-
-      fetch(SCRIPT_URL, {
-        method: "POST",
-        body: new FormData(form)
-      })
-      .then(response => response.text())
-      .then(data => {
-        alert("ส่งข้อมูลแจ้งซ่อมสำเร็จ!");
-        form.reset();
-        loadJobs(); // โหลดรายการใหม่ทันทีหลังส่งสำเร็จ
-      })
-      .catch(error => {
-        console.error("Error:", error);
-        alert("เกิดข้อผิดพลาดในการส่งข้อมูล");
-      })
-      .finally(() => {
-        submitBtn.disabled = false;
-        submitBtn.textContent = "ส่งใบแจ้งซ่อม";
-      });
+    document.addEventListener("DOMContentLoaded", function() {
+      loadDashboardData();
+      setInterval(loadDashboardData, 45000); 
     });
 
-    // 2. ดึงรายการแจ้งซ่อมมาแสดง (GET)
-    function loadJobs() {
-      const container = document.getElementById("jobList");
-      container.innerHTML = "กำลังโหลดข้อมูล...";
-
-      fetch(SCRIPT_URL + "?action=getJobs")
-        .then(response => response.json())
-        .then(data => {
-          if (!Array.isArray(data) || data.length === 0) {
-            container.innerHTML = "<p>ยังไม่มีรายการแจ้งซ่อม</p>";
-            return;
-          }
-
-          let html = `
-            <table>
-              <thead>
-                <tr>
-                  <th>เครื่องจักร</th>
-                  <th>อาการ</th>
-                  <th>ผู้แจ้ง</th>
-                  <th>สถานะ</th>
-                </tr>
-              </thead>
-              <tbody>
-          `;
-          data.forEach(job => {
-            html += `
-              <tr>
-                <td>${job.machine || "-"}</td>
-                <td>${job.issue || "-"}</td>
-                <td>${job.reporter || "-"}</td>
-                <td class="status">${job.status || "รอดำเนินการ"}</td>
-              </tr>
-            `;
-          });
-          html += "</tbody></table>";
-          container.innerHTML = html;
-        })
-        .catch(error => {
-          console.error("Load Error:", error);
-          container.innerHTML = "<p style='color:#666;'>ไม่สามารถโหลดรายการได้ (ตรวจสอบว่าฝั่ง Apps Script มีฟังก์ชัน doGet ที่คืนค่าเป็น JSON แล้วหรือยัง)</p>";
-        });
+    // ── Token จาก Apps Script template (server inject) ──────────
+    // authToken ถูก inject มาจาก doGet() ผ่าน HtmlTemplate
+    const AUTH_TOKEN = '<?= authToken ?>';
+    // เก็บไว้ใน localStorage เพื่อใช้ครั้งต่อไป (จำ login)
+    const STORAGE_KEY = 'maint_dash_token';
+    if (AUTH_TOKEN) localStorage.setItem(STORAGE_KEY, AUTH_TOKEN);
+    function getAuthToken() {
+      return AUTH_TOKEN || localStorage.getItem(STORAGE_KEY) || '';
     }
 
-    // โหลดข้อมูลอัตโนมัติเมื่อเปิดหน้าเว็บ
-    loadJobs();
-  </script>
+    function loadDashboardData() {
+      // document.getElementById('txt-update-time').innerText = 'กำลังโหลด...';
+      // document.getElementById('table-body').innerHTML = `
+      //   <tr><td colspan="6" class="p-12 text-center text-slate-400 font-medium">
+      //     <div class="flex flex-col items-center justify-center gap-2">
+      //       <span class="animate-spin text-xl">⏳</span>
+      //       <span>กำลังดึงข้อมูลและกรองเงื่อนไขฐานข้อมูล...</span>
+      //     </div>
+      //   </td></tr>`;
+      google.script.run
+        .withSuccessHandler(processInitialData)
+        .withFailureHandler(function(err) {
+          console.error(err);
+          document.getElementById('txt-update-time').innerText = "Error Connection";
+        })
+        .getDashboardData();
+    }
 
+    function processInitialData(data) {
+      if(data.error) { alert(data.error); return; }
+      document.getElementById('txt-update-time').innerText = data.updateTime;
+      document.getElementById('eff-day').innerText = data.effDay + "%";
+      document.getElementById('count-day').innerText = `เสร็จ ${data.statsOverview.day.closed} จากทั้งหมด ${data.statsOverview.day.total}`;
+      document.getElementById('eff-month').innerText = data.effMonth + "%";
+      document.getElementById('count-month').innerText = `เสร็จ ${data.statsOverview.month.closed} จากทั้งหมด ${data.statsOverview.month.total}`;
+      document.getElementById('eff-year').innerText = data.effYear + "%";
+      document.getElementById('count-year').innerText = `เสร็จแล้ว ${data.statsOverview.year.closed} | Machine Stop ${data.statsOverview.year.stop} ครั้ง`;
+
+      // normalize ทุก field ให้เป็น String เพื่อป้องกัน .trim() error
+      rawGlobalRecords = data.allRecords.map(function(item) {
+        return {
+          wo:          String(item.wo          || ''),
+          timestamp:   item.timestamp,
+          dateStr:     String(item.dateStr     || ''),
+          timeStr:     String(item.timeStr     || ''),
+          mc:          String(item.mc          || ''),
+          issue:       String(item.issue       || ''),
+          reporter:    String(item.reporter    || ''),
+          isStop:      item.isStop,
+          status:      String(item.status      || ''),
+          effectType:  String(item.effectType  || ''),
+          category:    String(item.category    || ''),
+          shift:       String(item.shift       || ''),
+          area:        String(item.area        || ''),
+          line:        String(item.line        || ''),
+          machineType: String(item.machineType || ''),
+          pdfUrl:      String(item.pdfUrl      || ''),
+          rootCause:   String(item.rootCause   || ''),
+          section:     String(item.section     || '')
+        };
+      });
+      
+      buildYearButtons();
+      populateDynamicDropdowns();
+      applyFiltersAndRender();
+    }
+
+    // ========================================================
+    // สร้างปุ่มปีแบบ Dynamic จากข้อมูลจริงใน rawGlobalRecords
+    // ========================================================
+    function buildYearButtons() {
+      const yearsSet = new Set();
+      rawGlobalRecords.forEach(item => {
+        const y = new Date(item.timestamp).getFullYear();
+        if (!isNaN(y)) yearsSet.add(y);
+      });
+
+      const sortedYears = Array.from(yearsSet).sort((a, b) => b - a); // ล่าสุดก่อน
+
+      const container = document.getElementById('year-buttons-container');
+      const placeholder = document.getElementById('year-buttons-placeholder');
+      if (placeholder) placeholder.remove();
+
+      // ล้างปุ่มปีเก่า (ถ้ามี) แต่เก็บ container ไว้
+      container.innerHTML = '';
+
+      if (sortedYears.length === 0) {
+        container.innerHTML = '<span class="px-3 py-1.5 text-xs text-slate-400 font-medium">ไม่พบข้อมูลปี</span>';
+        return;
+      }
+
+      sortedYears.forEach(year => {
+        const isActive = currentFilterTime === `year_${year}`;
+        const btn = document.createElement('button');
+        btn.id = `btn-time-year_${year}`;
+        btn.textContent = year;
+        btn.onclick = () => setTimeFilter(`year_${year}`);
+        btn.className = isActive
+          ? "px-4 py-1.5 rounded-lg text-xs font-bold transition-all bg-white text-slate-800 shadow-sm border border-slate-200 whitespace-nowrap"
+          : "px-4 py-1.5 rounded-lg text-xs font-bold transition-all text-slate-500 hover:text-slate-800 whitespace-nowrap";
+        container.appendChild(btn);
+      });
+
+      // สร้าง dropdown ปีใน month selector
+      buildMonthYearDropdown();
+
+      // set default month = เดือนปัจจุบัน
+      // const monthSel = document.getElementById('month-select');
+      // if (monthSel) monthSel.value = new Date().getMonth();
+    }
+
+    function getSectionValue(item) {
+      return String(item.machineType || item.area || item.AREA || item.location || item.LOCATION || item.section || item.SECTION || "-");
+    }
+
+    function populateDynamicDropdowns() {
+      const lineSelect = document.getElementById('filter-line-select');
+      const sectionSelect = document.getElementById('filter-section-select'); 
+      const effectSelect = document.getElementById('filter-effect-select');
+
+      const savedLine = currentFilterLine;
+      const savedSection = currentFilterSection;
+      const savedEffect = currentFilterEffect;
+      
+      lineSelect.innerHTML = '<option value="ALL">ทั้งหมด (All Lines)</option>';
+      sectionSelect.innerHTML = '<option value="ALL">ทั้งหมด (All Areas)</option>';
+      effectSelect.innerHTML = '<option value="ALL">ทั้งหมด (All Effects)</option>';
+      
+      let linesSet = new Set();
+      let sectionsSet = new Set();
+      let effectsSet = new Set();
+
+      rawGlobalRecords.forEach(item => {
+        let lVal = item.line || item.productionLine; 
+        if(lVal && lVal !== "-") linesSet.add(lVal.trim());
+        
+        let sVal = getSectionValue(item);
+        if(sVal && sVal !== "-") sectionsSet.add(sVal.trim());
+        
+        let eVal = item.effectType || item.mcType;
+        if(eVal && eVal !== "-") effectsSet.add(eVal.trim());
+      });
+
+      Array.from(linesSet).sort().forEach(val => { lineSelect.add(new Option(val, val)); });
+      Array.from(sectionsSet).sort().forEach(val => { sectionSelect.add(new Option(val, val)); });
+      Array.from(effectsSet).sort().forEach(val => { effectSelect.add(new Option(val, val)); });
+
+      lineSelect.value = savedLine;
+      sectionSelect.value = savedSection;
+      effectSelect.value = savedEffect;
+    }
+
+    function setMcSearch(val) {
+      currentFilterMC = val.trim().toUpperCase();
+      const clearBtn = document.getElementById('clear-mc-btn');
+      if (clearBtn) clearBtn.classList.toggle('hidden', !val.trim());
+      applyFiltersAndRender();
+    }
+
+    function clearMcSearch() {
+      currentFilterMC = '';
+      const input = document.getElementById('search-mc-input');
+      const clearBtn = document.getElementById('clear-mc-btn');
+      if (input) input.value = '';
+      if (clearBtn) clearBtn.classList.add('hidden');
+      applyFiltersAndRender();
+    }
+
+    function setMonthFilter(monthVal) {
+      currentFilterMonth = parseInt(monthVal);
+      const yearSel = document.getElementById('month-year-select');
+      currentFilterMonthYear = yearSel ? parseInt(yearSel.value) : new Date().getFullYear();
+
+      // อัปเดต label กราฟ
+      const thMonths = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+      const mo = currentFilterMonth >= 0 ? currentFilterMonth : new Date().getMonth();
+      const yr = currentFilterMonthYear > 0 ? currentFilterMonthYear : new Date().getFullYear();
+      document.getElementById('txt-chart-scope').innerText = `${thMonths[mo]} ${yr}`;
+      applyFiltersAndRender();
+    }
+
+    function buildMonthYearDropdown() {
+      // สร้าง dropdown ปีใน month selector จากข้อมูลจริง
+      const yearsSet = new Set();
+      rawGlobalRecords.forEach(item => {
+        const y = new Date(item.timestamp).getFullYear();
+        if (!isNaN(y)) yearsSet.add(y);
+      });
+      const sortedYears = Array.from(yearsSet).sort((a, b) => b - a);
+      const yearSel = document.getElementById('month-year-select');
+      if (!yearSel) return;
+      yearSel.innerHTML = '';
+      sortedYears.forEach(y => {
+        const opt = new Option(y, y);
+        yearSel.add(opt);
+      });
+      // default = ปีปัจจุบัน
+      // yearSel.value = new Date().getFullYear();
+      // currentFilterMonthYear = parseInt(yearSel.value);
+    }
+
+    function resetSubFilters() {
+      currentFilterLine    = 'ALL';
+      currentFilterSection = 'ALL';
+      currentFilterEffect  = 'ALL';
+      currentFilterStatus  = 'ALL';
+      currentFilterMC      = '';
+
+      document.getElementById('filter-line-select').value    = 'ALL';
+      document.getElementById('filter-section-select').value = 'ALL';
+      document.getElementById('filter-effect-select').value  = 'ALL';
+      document.getElementById('filter-status-select').value  = 'ALL';
+
+      const mcInput = document.getElementById('search-mc-input');
+      if (mcInput) mcInput.value = '';
+      const clearBtn = document.getElementById('clear-mc-btn');
+      if (clearBtn) clearBtn.classList.add('hidden');
+
+      applyFiltersAndRender();
+    }
+
+    function setTimeFilter(timeMode) {
+      currentFilterTime = timeMode;
+
+      // Fixed buttons: today, month, year, all
+      const fixedModes = ['today', 'month', 'year', 'all'];
+      fixedModes.forEach(m => {
+        const btn = document.getElementById(`btn-time-${m}`);
+        if (!btn) return;
+        btn.className = (m === timeMode) 
+          ? "px-4 py-1.5 rounded-lg text-xs font-bold transition-all bg-white text-slate-800 shadow-sm border border-slate-200"
+          : "px-4 py-1.5 rounded-lg text-xs font-bold transition-all text-slate-500 hover:text-slate-800";
+      });
+
+      // Year buttons: ไฮไลต์ปีที่เลือก
+      document.querySelectorAll('[id^="btn-time-year_"]').forEach(btn => {
+        const isActive = btn.id === `btn-time-${timeMode}`;
+        btn.className = isActive
+          ? "px-4 py-1.5 rounded-lg text-xs font-bold transition-all bg-white text-slate-800 shadow-sm border border-slate-200 whitespace-nowrap"
+          : "px-4 py-1.5 rounded-lg text-xs font-bold transition-all text-slate-500 hover:text-slate-800 whitespace-nowrap";
+      });
+
+      // แสดง/ซ่อน month selector
+      const monthWrap = document.getElementById('month-selector-wrap');
+      if (monthWrap) {
+        if (timeMode === 'month') {
+          monthWrap.classList.remove('hidden');
+          monthWrap.classList.add('flex');
+          // set default เป็นเดือนปัจจุบัน
+          const mo = new Date().getMonth();
+          const monthSel = document.getElementById('month-select');
+          if (monthSel && currentFilterMonth < 0) monthSel.value = mo;
+          currentFilterMonth = parseInt(document.getElementById('month-select').value);
+          currentFilterMonthYear = parseInt(document.getElementById('month-year-select').value) || new Date().getFullYear();
+        } else {
+          monthWrap.classList.add('hidden');
+          monthWrap.classList.remove('flex');
+          currentFilterMonth = -1;
+        }
+      }
+
+      // Label กราฟ
+      const thMonths = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+      const scopeTexts = { today: 'วันนี้', year: 'ปีนี้', all: 'ทั้งหมด' };
+      if (timeMode === 'month') {
+        const mo = currentFilterMonth >= 0 ? currentFilterMonth : new Date().getMonth();
+        const yr = currentFilterMonthYear > 0 ? currentFilterMonthYear : new Date().getFullYear();
+        document.getElementById('txt-chart-scope').innerText = `${thMonths[mo]} ${yr}`;
+      } else if (scopeTexts[timeMode]) {
+        document.getElementById('txt-chart-scope').innerText = scopeTexts[timeMode];
+      } else if (timeMode.startsWith('year_')) {
+        const yr = timeMode.replace('year_', '');
+        document.getElementById('txt-chart-scope').innerText = `ปี ${yr}`;
+      }
+
+      applyFiltersAndRender();
+    }
+
+    function setCategoryFilter(catMode) {
+      currentFilterCategory = catMode;
+      const categories = ['ALL', 'MECHANICAL', 'ELECTRICAL', 'UTILITY', 'PM'];
+      categories.forEach(c => {
+        const btn = document.getElementById(`btn-cat-${c.toLowerCase()}`);
+        if (!btn) return;
+        btn.className = (c === catMode)
+          ? "bg-white border-2 border-blue-500 rounded-2xl p-4 text-left transition-all shadow-sm flex flex-col gap-1 hover:scale-[1.02] duration-200 group"
+          : "bg-white border-2 border-transparent rounded-2xl p-4 text-left transition-all hover:border-slate-300 shadow-sm flex flex-col gap-1 hover:scale-[1.02] duration-200 group";
+      });
+      applyFiltersAndRender();
+    }
+
+    function setLineFilter(val) { currentFilterLine = val; applyFiltersAndRender(); }
+    function setSectionFilter(val) { currentFilterSection = val; applyFiltersAndRender(); }
+    function setEffectFilter(val) { currentFilterEffect = val; applyFiltersAndRender(); }
+    function setStatusFilter(val) { currentFilterStatus = val; applyFiltersAndRender(); }
+
+    // ========================================================
+    // กราฟแนวโน้ม — รองรับโหมด year_YYYY ด้วย
+    // ========================================================
+    // ─── Top 10 Machine Code Chart ───────────────────────────
+
+    // ── Pie Charts: Shift / Effect / Category ──────────────
+    function renderPieCharts(recordsList) {
+      const PALETTE = [
+        '#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6',
+        '#06b6d4','#f97316','#ec4899','#84cc16','#6366f1',
+        '#14b8a6','#e11d48','#0ea5e9','#d97706','#7c3aed'
+      ];
+
+      function buildPie(canvasId, labelId, dataMap, chartRef) {
+        const entries = Object.entries(dataMap)
+          .filter(([k]) => k && k !== '-')
+          .sort((a,b) => b[1]-a[1]);
+        const total = entries.reduce((s,[,v]) => s+v, 0);
+        const labels = entries.map(([k]) => k);
+        const values = entries.map(([,v]) => v);
+
+        const el = document.getElementById(labelId);
+        if (el) el.innerText = `— รวม ${total} รายการ`;
+
+        const ctx = document.getElementById(canvasId);
+        if (!ctx) return null;
+
+        return new Chart(ctx.getContext('2d'), {
+          type: 'doughnut',
+          data: {
+            labels,
+            datasets: [{
+              data: values,
+              backgroundColor: labels.map((_,i) => PALETTE[i % PALETTE.length]),
+              borderColor: '#fff',
+              borderWidth: 2,
+              hoverOffset: 6
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '55%',
+            plugins: {
+              legend: {
+                position: 'right',
+                labels: {
+                  color: '#475569',
+                  font: { size: 10, weight: '600' },
+                  padding: 10,
+                  boxWidth: 12,
+                  generateLabels: function(chart) {
+                    const data = chart.data;
+                    return data.labels.map((label, i) => {
+                      const val = data.datasets[0].data[i];
+                      const pct = total > 0 ? ((val/total)*100).toFixed(0) : 0;
+                      return {
+                        text: `${label}  ${pct}%`,
+                        fillStyle: data.datasets[0].backgroundColor[i],
+                        strokeStyle: '#fff',
+                        lineWidth: 1,
+                        index: i
+                      };
+                    });
+                  }
+                }
+              },
+              datalabels: {
+                display: function(ctx) { return ctx.dataset.data[ctx.dataIndex] > 0; },
+                color: '#fff',
+                font: { weight: 'bold', size: 10 },
+                formatter: (v) => {
+                  const pct = total > 0 ? ((v/total)*100).toFixed(0) : 0;
+                  return pct >= 8 ? pct+'%' : '';
+                }
+              },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => {
+                    const pct = total > 0 ? ((ctx.parsed/total)*100).toFixed(1) : 0;
+                    return ` ${ctx.label}: ${ctx.parsed} รายการ (${pct}%)`;
+                  }
+                }
+              }
+            }
+          }
+        });
+      }
+
+      // นับข้อมูล
+      const shiftMap = {}, effectMap = {}, catMap = {};
+      recordsList.forEach(r => {
+        const sh = (r.shift || '-').trim() || '-';
+        shiftMap[sh]  = (shiftMap[sh]  || 0) + 1;
+
+        const ef = (r.effectType || '-').trim() || '-';
+        effectMap[ef] = (effectMap[ef] || 0) + 1;
+
+        // ใช้ ROOT CAUSE (คอลัมน์ T) สำหรับ pie chart
+        const ca = (r.rootCause || r.category || '-').trim() || '-';
+        catMap[ca]    = (catMap[ca]    || 0) + 1;
+      });
+
+      if (myPieShift)  myPieShift.destroy();
+      if (myPieEffect) myPieEffect.destroy();
+      if (myPieCat)    myPieCat.destroy();
+
+      myPieShift  = buildPie('pieShiftChart',  'txt-pie-shift-total',  shiftMap);
+      myPieEffect = buildPie('pieEffectChart', 'txt-pie-effect-total', effectMap);
+      myPieCat    = buildPie('pieCatChart',    'txt-pie-cat-total',    catMap);
+    }
+
+    function renderTop10Chart(recordsList) {
+      const mcCount = {};
+      recordsList.forEach(item => {
+        const mc = (item.mc || '').trim();
+        if (!mc || mc === '-') return;
+        mcCount[mc] = (mcCount[mc] || 0) + 1;
+      });
+
+      // เรียงและเอา top 10
+      const sorted = Object.entries(mcCount)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10);
+
+      const labels = sorted.map(e => e[0]);
+      const values = sorted.map(e => e[1]);
+
+      // สีไล่ระดับ intensity
+      const maxVal = values[0] || 1;
+      const colors = values.map(v => {
+        const intensity = 0.4 + 0.6 * (v / maxVal);
+        return `rgba(239, 68, 68, ${intensity})`;
+      });
+      const borderColors = values.map(v => {
+        const intensity = 0.6 + 0.4 * (v / maxVal);
+        return `rgba(220, 38, 38, ${intensity})`;
+      });
+
+      const ctx = document.getElementById('top10BarChart').getContext('2d');
+      if (myTop10Chart) myTop10Chart.destroy();
+
+      myTop10Chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'จำนวนการแจ้งซ่อม',
+            data: values,
+            backgroundColor: colors,
+            borderColor: borderColors,
+            borderWidth: 1.5,
+            borderRadius: 6,
+            borderSkipped: false,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          onClick: function(evt, elements) {
+            if (elements.length > 0) {
+              const mc = labels[elements[0].index];
+              // กรองตาม MC code ที่คลิก
+              currentFilterMC = mc.toUpperCase();
+              const input = document.getElementById('search-mc-input');
+              if (input) input.value = mc;
+              const clearBtn = document.getElementById('clear-mc-btn');
+              if (clearBtn) clearBtn.classList.remove('hidden');
+              const clearTop10Btn = document.getElementById('btn-clear-top10');
+              if (clearTop10Btn) clearTop10Btn.classList.remove('hidden');
+              applyFiltersAndRender();
+            }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => ` ${ctx.parsed.y} ครั้ง`,
+                afterLabel: ctx => {
+                  const mc = labels[ctx.dataIndex];
+                  const pct = ((ctx.parsed.y / recordsList.length) * 100).toFixed(1);
+                  return ` (${pct}% ของทั้งหมด)`;
+                }
+              }
+            },
+            datalabels: {
+              anchor: 'end',
+              align: 'end',
+              color: '#334155',
+              font: { weight: 'bold', size: 11 },
+              formatter: v => v,
+              padding: { bottom: 2 }
+            }
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: { color: '#64748b', font: { size: 11, weight: '600' } }
+            },
+            y: {
+              grid: { color: '#f1f5f9' },
+              ticks: { color: '#64748b', stepSize: 1 },
+              beginAtZero: true
+            }
+          }
+        }
+      });
+
+      // อัปเดต scope label
+      const total = sorted.reduce((s, e) => s + e[1], 0);
+      const scopeEl = document.getElementById('txt-top10-scope');
+      if (scopeEl) scopeEl.innerText = `— รวม ${total} ครั้ง จาก ${Object.keys(mcCount).length} เครื่อง`;
+    }
+
+    function clearTop10Filter() {
+      currentFilterMC = '';
+      const input = document.getElementById('search-mc-input');
+      if (input) input.value = '';
+      const clearMcBtn = document.getElementById('clear-mc-btn');
+      if (clearMcBtn) clearMcBtn.classList.add('hidden');
+      const clearTop10Btn = document.getElementById('btn-clear-top10');
+      if (clearTop10Btn) clearTop10Btn.classList.add('hidden');
+      applyFiltersAndRender();
+    }
+
+    function renderLineTrendChart(recordsList, filterMode) {
+      let labels = []; let completeData = []; let pendingData = [];
+
+      if (filterMode === 'today') {
+        for (let h = 0; h < 24; h++) {
+          labels.push(`${String(h).padStart(2, '0')}:00`); completeData.push(0); pendingData.push(0);
+        }
+        recordsList.forEach(item => {
+          const hour = new Date(item.timestamp).getHours();
+          if (item.status === 'COMPLETE') completeData[hour]++; else pendingData[hour]++;
+        });
+      } 
+      else if (filterMode === 'month') {
+        const now = new Date();
+        const mo = currentFilterMonth >= 0 ? currentFilterMonth : now.getMonth();
+        const yr = currentFilterMonthYear > 0 ? currentFilterMonthYear : now.getFullYear();
+        const thMonths = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+        const daysInMonth = new Date(yr, mo + 1, 0).getDate();
+        for (let d = 1; d <= daysInMonth; d++) {
+          labels.push(`${d} ${thMonths[mo]}`); completeData.push(0); pendingData.push(0);
+        }
+        recordsList.forEach(item => {
+          // ใช้ dateStr แทน new Date(timestamp) เพื่อความแม่นยำ timezone
+          const parts = (item.dateStr || '').split('/');
+          const iDay = parseInt(parts[0]) || 0;
+          const iMo  = (parseInt(parts[1]) || 1) - 1;
+          const iYr  = parseInt(parts[2]) || 0;
+          if (iMo === mo && iYr === yr) {
+            const dateIndex = iDay - 1;
+            if (dateIndex >= 0 && dateIndex < daysInMonth) {
+              if (item.status === 'COMPLETE') completeData[dateIndex]++; else pendingData[dateIndex]++;
+            }
+          }
+        });
+      } 
+      else {
+        // โหมด 'year' (ปีนี้) หรือ 'year_YYYY' (ปีที่เลือก) — แสดงแบบรายเดือน
+        labels = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+        completeData = Array(12).fill(0); pendingData = Array(12).fill(0);
+        recordsList.forEach(item => {
+          const parts = (item.dateStr || '').split('/');
+          const monthIndex = (parseInt(parts[1]) || 1) - 1; // 0-based จาก dateStr
+          if (monthIndex >= 0 && monthIndex < 12) {
+            if (item.status === 'COMPLETE') completeData[monthIndex]++; else pendingData[monthIndex]++;
+          }
+        });
+      }
+
+      const ctx = document.getElementById('timeTrendLineChart').getContext('2d');
+      if (myLineChart) myLineChart.destroy();
+
+      myLineChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            { label: '✓ เสร็จสิ้น (Complete)', data: completeData, borderColor: '#10b981', backgroundColor: '#10b981', borderWidth: 3, tension: 0.2, pointRadius: 4 },
+            { label: '● รอดำเนินการ (Pending)', data: pendingData, borderColor: '#FF0000', backgroundColor: '#FF0000', borderWidth: 3, tension: 0.2, pointRadius: 4 }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'top', labels: { color: '#64748b', font: { weight: 'bold' } } },
+            datalabels: {
+              align: 'top', backgroundColor: function(context) { return context.dataset.borderColor; },
+              borderRadius: 4, color: 'white', font: { weight: 'bold', size: 10 },
+              formatter: function(value) { return value > 0 ? value : ''; }, padding: 4
+            }
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 11 } } },
+            y: { grid: { color: '#f1f5f9' }, ticks: { color: '#64748b', stepSize: 1 } }
+          }
+        }
+      });
+    }
+
+    // ========================================================
+    // กรองข้อมูลตาม Time Filter รวมถึง year_YYYY
+    // ========================================================
+    function applyFiltersAndRender() {
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      const dayTodayStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth()+1).padStart(2, '0')}/${now.getFullYear()}`;
+
+      let timeFilteredRecords = rawGlobalRecords.filter(item => {
+        if (currentFilterTime === 'today') return item.dateStr === dayTodayStr;
+        if (currentFilterTime === 'all') return true;
+
+        // ดึง dd/MM/yyyy จาก dateStr แทนการใช้ new Date() เพื่อหลีกเลี่ยง timezone
+        const parts = (item.dateStr || '').split('/');
+        const itemDay   = parseInt(parts[0]) || 0;
+        const itemMonth = (parseInt(parts[1]) || 1) - 1; // 0-based
+        const itemYear  = parseInt(parts[2]) || 0;
+
+        if (currentFilterTime === 'month') {
+          const filterMo = currentFilterMonth >= 0 ? currentFilterMonth : currentMonth;
+          const filterYr = currentFilterMonthYear > 0 ? currentFilterMonthYear : currentYear;
+          return itemMonth === filterMo && itemYear === filterYr;
+        }
+
+        if (currentFilterTime === 'year') return itemYear === currentYear;
+
+        // กรองตามปีที่ระบุ เช่น 'year_2025'
+        if (currentFilterTime.startsWith('year_')) {
+          const selectedYear = parseInt(currentFilterTime.replace('year_', ''), 10);
+          return itemYear === selectedYear;
+        }
+
+        return true;
+      });
+
+      let subFilteredRecordsForCategories = timeFilteredRecords.filter(item => {
+        if (currentFilterLine === 'ALL') return true;
+        let itemLine = item.line || item.productionLine;
+        return itemLine && itemLine.trim() === currentFilterLine.trim();
+      }).filter(item => {
+        if (currentFilterSection === 'ALL') return true;
+        let itemSec = getSectionValue(item);
+        return itemSec && itemSec.trim() === currentFilterSection.trim();
+      }).filter(item => {
+        if (currentFilterEffect === 'ALL') return true;
+        let itemEffect = item.effectType || item.mcType;
+        return itemEffect && itemEffect.trim() === currentFilterEffect.trim();
+      }).filter(item => {
+        if (currentFilterStatus === 'ALL') return true;
+        return currentFilterStatus === 'COMPLETE' ? item.status === 'COMPLETE' : item.status !== 'COMPLETE';
+      }).filter(item => {
+        // Machine Code search — ค้นหาแบบ contains, case-insensitive
+        if (!currentFilterMC) return true;
+        const mc = String(item.mc || '').toUpperCase();
+        return mc.includes(currentFilterMC);
+      });
+
+      let counterTypes = {
+        ALL: { total: 0, done: 0, pend: 0 }, MECHANICAL: { total: 0, done: 0, pend: 0 },
+        ELECTRICAL: { total: 0, done: 0, pend: 0 }, UTILITY: { total: 0, done: 0, pend: 0 }, PM: { total: 0, done: 0, pend: 0 }
+      };
+      
+      // helper: map category value → key
+      function getCatKey(raw) {
+        const v = (raw || '').toUpperCase().trim();
+        if (v.includes('MECHANICAL') || v === 'ME') return 'MECHANICAL';
+        if (v.includes('ELECTRICAL') || v === 'EE') return 'ELECTRICAL';
+        if (v.includes('UTILITY')    || v === 'UT') return 'UTILITY';
+        if (v.includes('PM'))                       return 'PM';
+        return null;
+      }
+
+      subFilteredRecordsForCategories.forEach(item => {
+        const isDone = item.status === 'COMPLETE';
+        counterTypes.ALL.total++;
+        if (isDone) counterTypes.ALL.done++; else counterTypes.ALL.pend++;
+        const key = getCatKey(item.category);
+        if (key) {
+          counterTypes[key].total++;
+          if (isDone) counterTypes[key].done++; else counterTypes[key].pend++;
+        }
+      });
+
+      ['all', 'mechanical', 'electrical', 'utility', 'pm'].forEach(key => {
+        let uKey = key.toUpperCase();
+        document.getElementById(`count-type-${key}`).innerText = counterTypes[uKey].total;
+        document.getElementById(`done-cat-${key}`).innerText = counterTypes[uKey].done;
+        document.getElementById(`pend-cat-${key}`).innerText = counterTypes[uKey].pend;
+      });
+
+      let finalRecords = subFilteredRecordsForCategories.filter(item => {
+        if (currentFilterCategory === 'ALL') return true;
+        // ใช้ getCatKey เพื่อ normalize ทุกรูปแบบ เช่น "Mechanical Part", "ME", "⚙️ MECHANICAL"
+        const itemCatKey = getCatKey(item.category);
+        return itemCatKey === currentFilterCategory;
+      });
+
+      renderLineTrendChart(finalRecords, currentFilterTime);
+      renderTop10Chart(finalRecords);
+      renderPieCharts(finalRecords);
+
+      // ── อัปเดต KPI ตามช่วงเวลาที่เลือก ────────────────────
+      const kpiRecs    = finalRecords; // ใช้ records ที่ผ่าน filter ทั้งหมดแล้ว
+      const kpiTotal   = kpiRecs.length;
+      const kpiClosed  = kpiRecs.filter(r => r.status === 'COMPLETE').length;
+      const kpiStop    = kpiRecs.filter(r => r.isStop === true || r.isStop === 'true' || r.isStop === 'ใช่').length;
+      const kpiEff     = kpiTotal > 0 ? ((kpiClosed / kpiTotal) * 100).toFixed(1) : '0.0';
+
+      // Label ตาม filter ที่เลือก
+      const thMonths   = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+      let kpiLabel = 'วันนี้';
+      if      (currentFilterTime === 'today')              kpiLabel = 'วันนี้';
+      else if (currentFilterTime === 'month') {
+        const mo = currentFilterMonth >= 0 ? currentFilterMonth : new Date().getMonth();
+        const yr = currentFilterMonthYear > 0 ? currentFilterMonthYear : new Date().getFullYear();
+        kpiLabel = `${thMonths[mo]} ${yr}`;
+      }
+      else if (currentFilterTime === 'year')               kpiLabel = `ปี ${new Date().getFullYear()}`;
+      else if (currentFilterTime.startsWith('year_'))      kpiLabel = `ปี ${currentFilterTime.replace('year_','')}`;
+      else if (currentFilterTime === 'all')                kpiLabel = 'ทั้งหมด';
+
+      // อัปเดต KPI card แถวแรก (Today) ให้แสดงค่าตาม filter ปัจจุบัน
+      document.getElementById('eff-day').innerText    = kpiEff + '%';
+      document.getElementById('count-day').innerText  = `เสร็จ ${kpiClosed} / ${kpiTotal} (${kpiLabel})`;
+
+      // KPI card เดือน/ปี ยังคงแสดงค่าจาก server (ภาพรวมทั้งเดือน/ปี) เหมือนเดิม
+      // เว้นแต่ผู้ใช้เลือก filter เดือนหรือปีอยู่
+      if (currentFilterTime === 'month' || currentFilterTime.startsWith('month')) {
+        document.getElementById('eff-month').innerText  = kpiEff + '%';
+        document.getElementById('count-month').innerText= `เสร็จ ${kpiClosed} / ${kpiTotal}`;
+      }
+      if (currentFilterTime === 'year' || currentFilterTime.startsWith('year_')) {
+        document.getElementById('eff-year').innerText   = kpiEff + '%';
+        document.getElementById('count-year').innerText = `เสร็จ ${kpiClosed} | Stop ${kpiStop} ครั้ง`;
+      }
+
+      document.getElementById('badge-table-count').innerText = finalRecords.length + " รายการ";
+
+      const tbody = document.getElementById('table-body');
+      tbody.innerHTML = "";
+
+      if (finalRecords.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="p-12 text-center text-slate-400 font-medium">🚫 ไม่พบข้อมูลบันทึกตามเงื่อนไขที่เลือกคัดกรอง</td></tr>`;
+        return;
+      }
+
+      finalRecords.forEach(item => {
+        const isStopVal = String(item.isStop).toUpperCase();
+        const isComplete = item.status === 'COMPLETE';
+
+        // Badge ล่าง: STOP / RUN(link ปิดงาน) / PDF(ถ้าเสร็จแล้ว)
+        let bottomBadge = '';
+        if (isStopVal.includes("หยุด") || isStopVal.includes("TRUE") || isStopVal.includes("STOP")) {
+          bottomBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-200">🛑 STOP</span>`;
+        } else if (!isComplete) {
+          bottomBadge = `<a href="https://forms.gle/Ugc2a4pm4peZYHAi8" target="_blank" onclick="event.stopPropagation()" class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-50 text-slate-500 border border-slate-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all cursor-pointer">🌏 Link ปิดงาน</a>`;
+        }
+
+        // ปุ่ม PDF เมื่อเสร็จสิ้น
+        const pdfBadge = isComplete && item.pdfUrl
+          ? `<a href="${item.pdfUrl}" target="_blank" onclick="event.stopPropagation()" class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition-all cursor-pointer flex items-center gap-0.5">📑 PDF รายงาน</a>`
+          : '';
+
+        const statusText = isComplete
+          ? `<span class="px-2 py-0.5 rounded text-[11px] bg-emerald-50 text-emerald-600 font-bold border border-emerald-200 flex items-center gap-1">✓ เสร็จสิ้น</span>`
+          : `<span class="px-2 py-0.5 rounded text-[11px] bg-amber-50 text-red-600 font-bold border border-amber-200 animate-pulse flex items-center gap-1">● รอดำเนินการ</span>`;
+
+        // ใช้ field ที่ถูกต้องจาก getDashboardData:
+        // item.area     = คอลัมน์ AK (LOCATION / พื้นที่)  index 5
+        // item.line     = คอลัมน์ AK (Line)               index 36
+        // item.machineType = คอลัมน์ AQ (Machine Type)    index 42
+        // item.shift    = คอลัมน์ J  (WORK SHIFT)         index 9
+        // item.section  = คอลัมน์ k index10
+        const areaDisplay   = String(item.machineType || item.area || '-');
+        const lineDisplay   = String(item.section || '-');
+        const shiftDisplay  = item.shift || '-';
+
+        const rowHtml = `
+          <tr class="hover:bg-slate-50 transition-colors duration-150">
+            <td class="p-4 pl-6 font-mono border-b border-slate-100">
+              <span class="text-slate-900 font-bold block text-sm tracking-tight">${item.wo || '-'}</span>
+              <span class="text-[11px] text-slate-400 font-medium mt-0.5 block">${item.dateStr || ''} ${item.timeStr || ''}</span>
+            </td>
+            <td class="p-4 border-b border-slate-100">
+              <span class="font-bold text-slate-800 block text-sm tracking-tight">${item.mc || '-'}</span>
+              <span class="inline-block mt-1 text-[11px] text-slate-500 font-semibold bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200"> ${areaDisplay}</span>
+            </td>
+            <td class="p-4 border-b border-slate-100">
+              <span class="text-slate-600 block text-xs font-semibold">Line: ${lineDisplay}</span>
+              <span class="inline-block mt-1 text-[10px] font-extrabold px-2 py-0.5 bg-blue-50 text-blue-600 border border-blue-100 rounded-md">${item.category || 'OTHER'}</span>
+            </td>
+            <td class="p-4 text-slate-600 max-w-xs border-b border-slate-100" title="${item.issue}">
+              <span class="block text-slate-800 font-bold truncate text-xs">${item.issue || '-'}</span>
+              <span class="inline-block mt-1 text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">Effect: ${item.effectType || item.mcType || 'ทั่วไป'}</span>
+            </td>
+            <td class="p-4 border-b border-slate-100">
+              <span class="text-slate-800 font-semibold block text-xs">${item.section || '-'}</span>
+              <span class="text-[11px] text-slate-400 block font-mono mt-0.5">${shiftDisplay}</span>
+            </td>
+            <td class="p-4 text-center border-b border-slate-100 pr-6">
+              <div class="flex flex-col items-center justify-center gap-1.5">
+                ${statusText}
+                ${bottomBadge}
+                ${pdfBadge}
+              </div>
+            </td>
+          </tr>
+        `;
+        tbody.insertAdjacentHTML('beforeend', rowHtml);
+      });
+    }
+    // สมมติว่าตัวแปร allData คือข้อมูลทั้งหมดที่ดึงมาจาก Google Sheets
+// 1. ประกาศตัวแปรเก็บรายชื่อ Section ทั้งหมด (แบบไม่ให้ซ้ำกัน เอาไว้ทำเป็น Label ของกราฟ)
+let sections = [...new Set(allData.map(item => item.section))];
+
+// 2. ตัวอย่างการนับจำนวนข้อมูลในแต่ละ Section เพื่อเอาไปทำเป็น Data ของกราฟ
+let sectionCounts = sections.map(sec => {
+  return allData.filter(item => item.section === sec).length;
+});
+
+// 3. นำตัวแปร `sections` และ `sectionCounts` ไปสร้าง Chart.js
+const ctx = document.getElementById('myChart').getContext('2d');
+new Chart(ctx, {
+  type: 'bar', // หรือ 'pie', 'line' ตามต้องการ
+  data: {
+    labels: sections,       // เอาตัวแปร sections มาใส่ตรงนี้เป็นแกน X
+    datasets: [{
+      label: 'จำนวนงานตาม Section',
+      data: sectionCounts,  // เอาตัวแปรจำนวนข้อมูลมาใส่ตรงนี้
+      backgroundColor: 'rgba(54, 162, 235, 0.5)'
+    }]
+  }
+});
+  </script>
 </body>
 </html>
