@@ -1,0 +1,48 @@
+const SHEET_NAME = "Jobs";
+
+function getOrCreateSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_NAME);
+    sheet.appendRow(["timestamp", "machine", "issue", "reporter", "status"]);
+  }
+  return sheet;
+}
+
+function doGet(e) {
+  const sheet = getOrCreateSheet();
+  const rows = sheet.getDataRange().getValues();
+  const action = (e && e.parameter && e.parameter.action) || "";
+
+  if (action === "getJobs") {
+    const headers = rows[0] || ["timestamp", "machine", "issue", "reporter", "status"];
+    const data = rows.slice(1).map(row => {
+      const obj = {};
+      headers.forEach((h, i) => obj[h] = row[i]);
+      return obj;
+    });
+    return ContentService
+      .createTextOutput(JSON.stringify(data))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  return ContentService
+    .createTextOutput(JSON.stringify({ status: "ok", message: "Apps Script is running" }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  const sheet = getOrCreateSheet();
+  const p = (e && e.parameter) || {};
+  sheet.appendRow([
+    new Date(),
+    p.machine || "",
+    p.issue || "",
+    p.reporter || "",
+    p.status || "รอดำเนินการ"
+  ]);
+  return ContentService
+    .createTextOutput(JSON.stringify({ result: "success" }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
