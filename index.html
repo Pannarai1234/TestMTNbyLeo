@@ -1,48 +1,135 @@
-const SHEET_NAME = "Jobs";
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบแจ้งซ่อม (Test_MNT)</title>
+  <style>
+    body { font-family: sans-serif; max-width: 700px; margin: 30px auto; padding: 0 15px; background: #f4f6f9; color: #333; }
+    .card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    h2 { margin-top: 0; color: #1a73e8; }
+    label { display: block; margin-top: 12px; font-weight: bold; font-size: 14px; }
+    input, select, textarea { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; font-family: inherit; }
+    button { margin-top: 16px; padding: 12px 20px; background: #1a73e8; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-size: 15px; width: 100%; }
+    button:hover { background: #1557b0; }
+    button:disabled { background: #999; cursor: not-allowed; }
+    .btn-secondary { background: #34a853; margin-top: 0; width: auto; padding: 8px 14px; font-size: 13px; }
+    .btn-secondary:hover { background: #2a8542; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background: #f1f3f4; }
+    .status { font-weight: bold; color: #d93025; }
+  </style>
+</head>
+<body>
 
-function getOrCreateSheet() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName(SHEET_NAME);
-  if (!sheet) {
-    sheet = ss.insertSheet(SHEET_NAME);
-    sheet.appendRow(["timestamp", "machine", "issue", "reporter", "status"]);
-  }
-  return sheet;
-}
+  <!-- ส่วนที่ 1: ฟอร์มส่งข้อมูลแจ้งซ่อม (POST) -->
+  <div class="card">
+    <h2>🔧 แจ้งซ่อมเครื่องจักร</h2>
+    <form id="repairForm">
+      <label for="machine">ชื่อ / รหัสเครื่องจักร</label>
+      <input type="text" id="machine" name="machine" placeholder="เช่น Forging Press #1" required>
 
-function doGet(e) {
-  const sheet = getOrCreateSheet();
-  const rows = sheet.getDataRange().getValues();
-  const action = (e && e.parameter && e.parameter.action) || "";
+      <label for="issue">อาการเสีย / รายละเอียด</label>
+      <textarea id="issue" name="issue" rows="3" placeholder="อธิบายอาการที่พบ..." required></textarea>
 
-  if (action === "getJobs") {
-    const headers = rows[0] || ["timestamp", "machine", "issue", "reporter", "status"];
-    const data = rows.slice(1).map(row => {
-      const obj = {};
-      headers.forEach((h, i) => obj[h] = row[i]);
-      return obj;
+      <label for="reporter">ชื่อผู้แจ้ง</label>
+      <input type="text" id="reporter" name="reporter" placeholder="ระบุชื่อผู้แจ้ง" required>
+
+      <input type="hidden" name="status" value="รอดำเนินการ">
+
+      <button type="submit" id="submitBtn">ส่งใบแจ้งซ่อม</button>
+    </form>
+  </div>
+
+  <!-- ส่วนที่ 2: ดึงข้อมูลรายการแจ้งซ่อมมาแสดง (GET) -->
+  <div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <h2 style="margin: 0;">📋 รายการแจ้งซ่อม</h2>
+      <button type="button" class="btn-secondary" onclick="loadJobs()">รีเฟรชข้อมูล</button>
+    </div>
+    <div id="jobList">กำลังโหลดข้อมูล...</div>
+  </div>
+
+  <script>
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwOpoaH12S6oLyJKv4k8oZcjVZWWhvT7jGIKZkN9skCroJV9TEjktAQiEFtcwbbUIVA/exec";
+
+    // 1. ส่งข้อมูลแจ้งซ่อม (POST)
+    const form = document.getElementById("repairForm");
+    const submitBtn = document.getElementById("submitBtn");
+
+    form.addEventListener("submit", function(e) {
+      e.preventDefault();
+      submitBtn.disabled = true;
+      submitBtn.textContent = "กำลังส่งข้อมูล...";
+
+      fetch(SCRIPT_URL, {
+        method: "POST",
+        body: new FormData(form)
+      })
+      .then(response => response.text())
+      .then(data => {
+        alert("ส่งข้อมูลแจ้งซ่อมสำเร็จ!");
+        form.reset();
+        loadJobs(); // โหลดรายการใหม่ทันทีหลังส่งสำเร็จ
+      })
+      .catch(error => {
+        console.error("Error:", error);
+        alert("เกิดข้อผิดพลาดในการส่งข้อมูล");
+      })
+      .finally(() => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "ส่งใบแจ้งซ่อม";
+      });
     });
-    return ContentService
-      .createTextOutput(JSON.stringify(data))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
 
-  return ContentService
-    .createTextOutput(JSON.stringify({ status: "ok", message: "Apps Script is running" }))
-    .setMimeType(ContentService.MimeType.JSON);
-}
+    // 2. ดึงรายการแจ้งซ่อมมาแสดง (GET)
+    function loadJobs() {
+      const container = document.getElementById("jobList");
+      container.innerHTML = "กำลังโหลดข้อมูล...";
 
-function doPost(e) {
-  const sheet = getOrCreateSheet();
-  const p = (e && e.parameter) || {};
-  sheet.appendRow([
-    new Date(),
-    p.machine || "",
-    p.issue || "",
-    p.reporter || "",
-    p.status || "รอดำเนินการ"
-  ]);
-  return ContentService
-    .createTextOutput(JSON.stringify({ result: "success" }))
-    .setMimeType(ContentService.MimeType.JSON);
-}
+      fetch(SCRIPT_URL + "?action=getJobs")
+        .then(response => response.json())
+        .then(data => {
+          if (!Array.isArray(data) || data.length === 0) {
+            container.innerHTML = "<p>ยังไม่มีรายการแจ้งซ่อม</p>";
+            return;
+          }
+
+          let html = `
+            <table>
+              <thead>
+                <tr>
+                  <th>เครื่องจักร</th>
+                  <th>อาการ</th>
+                  <th>ผู้แจ้ง</th>
+                  <th>สถานะ</th>
+                </tr>
+              </thead>
+              <tbody>
+          `;
+          data.forEach(job => {
+            html += `
+              <tr>
+                <td>${job.machine || "-"}</td>
+                <td>${job.issue || "-"}</td>
+                <td>${job.reporter || "-"}</td>
+                <td class="status">${job.status || "รอดำเนินการ"}</td>
+              </tr>
+            `;
+          });
+          html += "</tbody></table>";
+          container.innerHTML = html;
+        })
+        .catch(error => {
+          console.error("Load Error:", error);
+          container.innerHTML = "<p style='color:#666;'>ไม่สามารถโหลดรายการได้ (ตรวจสอบว่าฝั่ง Apps Script มีฟังก์ชัน doGet ที่คืนค่าเป็น JSON แล้วหรือยัง)</p>";
+        });
+    }
+
+    // โหลดข้อมูลอัตโนมัติเมื่อเปิดหน้าเว็บ
+    loadJobs();
+  </script>
+
+</body>
+</html>
